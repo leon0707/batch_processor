@@ -31,4 +31,4 @@ for t in threads:
     t.join()
 ```
 
-This piece of code mimics 200 incomming requests that can be processed in batches whose size is 32. There are 2 workers. They take batches and double each integers in the batch, then return results in batches.
+This piece of code generates discrete 200 incomming requests that can be processed in batches whose size is 32. There are 2 workers processing these requests. They take batches and double each integers in the batch, then return results in batches.
