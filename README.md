@@ -32,3 +32,27 @@ for t in threads:
 ```
 
 This piece of code generates discrete 200 incomming requests that can be processed in batches whose size is 32. There are 2 workers processing these requests. They take batches and double each integers in the batch, then return results in batches.
+
+## test
+* run test cases
+  ```shell
+  python tests/test_runner.py
+  ```
+* generate coverage
+  ```shell
+  coverage run tests/test_runner.py
+  ```
+* generate coverage html
+  ```shell
+  coverage html
+  ```
+
+## build
+build the distribution
+```shell
+python setup.py sdist bdist_wheel
+```
+upload to registry
+```shell
+python -m twine upload dist/*
+```

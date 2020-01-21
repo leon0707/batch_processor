@@ -44,15 +44,18 @@ class Worker(object):
         self.batch_func = batch_func
         self._sleep_time = sleep_time
         self.__pause = mp.Value('i', False, lock=True)
+        self.__stop_evt = Event()
 
     def loop_run(self):
-        worker_id = getpid()
-        print('worker {} starts working'.format(worker_id))
+        self._worker_id = getpid()
+        print('worker {} starts working'.format(self._worker_id))
         counter = 0
         batch = []
         while True:
+            if self.__stop_evt.is_set():
+                break
             if self.is_paused():
-                continue
+                continue    
             batch = self.__fill_batch()
             if batch:
                 inputs = [req for task_id, req in batch] # batch func doesn't need task_id
@@ -60,7 +63,7 @@ class Worker(object):
                 for i in range(len(batch)):
                     # match result with task_id
                     self.__process_result(batch[i][0], results[i])
-                print('worker {} processes {}'.format(worker_id, len(results)))
+                print('worker {} processes {}'.format(self._worker_id, len(results)))
             else:
                 sleep(self._sleep_time)
 
@@ -90,6 +93,11 @@ class Worker(object):
         with self.__pause.get_lock():
             self.__pause.value = False
 
+    def destory(self):
+        print('destory the worker {}'.format(self._worker_id))
+        # set the stop event
+        self.__stop_evt.set()
+
 class BatchProcessor(object):
 
     def __init__(self, batch_func, worker_num=1, batch_size=32, task_wait_time=4):
@@ -101,6 +109,7 @@ class BatchProcessor(object):
         self._cache_ref = _TaskCache() # a dict to save result of task
 
         self._result_collector = Thread(target=self.__loop_collect_result, daemon=True)
+        self.__stop_collector_evt = Event()
         self._result_collector.start()
 
         self._worker = Worker(self._input_queue, self._output_queue, batch_size, batch_func)
@@ -112,10 +121,14 @@ class BatchProcessor(object):
     def __loop_collect_result(self):
         # infinite loop to collect result from output queue
         while True:
+            if self.__stop_collector_evt.is_set():
+                break
             try:
                 task_id, res = self._output_queue.get(block=False)
-                task = self._cache_ref[task_id]
-                task.set_result(res)
+                # if the task is not timeout
+                task = self._cache_ref.get(task_id)
+                if task:
+                    task.set_result(res)
             except Empty as e:
                 pass # or sleep
 
@@ -147,3 +160,14 @@ class BatchProcessor(object):
         task_id = self.__add_request(input_val)
         res = self.__get_result(task_id)
         return res
+
+    def __destory_collector(self):
+        self.__stop_collector_evt.set()
+
+    def terminate(self):
+        print('terminate the BatchProcessor')
+        for p in self._worker_ps:
+            p.terminate()
+
+        self.__destory_collector()
+        self._result_collector.join()
