@@ -35,6 +35,7 @@ jobs:
       - run:
           name: run tests
           command: |
+            mkdir test-results
             . venv/bin/activate
             python tests/test_runner.py
 
